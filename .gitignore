@@ -1,0 +1,16 @@
+**/bin/
+**/obj/
+.vs/
+.idea/
+.DS_Store
+*.user
+*.suo
+artifacts/
+results/
+TestResults/
+**/config.yml
+**/sftp-config.yml
+*.pem
+*.key
+src/Compliance_Scanner/Policies/CIS/*
+!src/Compliance_Scanner/Policies/CIS/README.md

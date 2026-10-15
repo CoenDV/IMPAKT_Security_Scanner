@@ -1,0 +1,8 @@
+# Sftp_Uploader Configuration File
+host: sftp.example.com
+port: 22
+user: report-uploader
+key_path: /path/to/private/key
+host_key_sha256: SHA256:replace-with-server-fingerprint
+remote_path: /reports
+# log_file: results/sftp-upload.log
