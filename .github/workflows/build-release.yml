@@ -1,0 +1,137 @@
+name: Build and release
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  DOTNET_CLI_TELEMETRY_OPTOUT: '1'
+  DOTNET_NOLOGO: '1'
+
+jobs:
+  build:
+    name: Build and test (${{ matrix.runtime }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-2022
+            runtime: win-x64
+          - os: ubuntu-24.04
+            runtime: linux-x64
+          - os: macos-15
+            runtime: osx-arm64
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Check out source
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+
+      - name: Set up .NET SDK
+        uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5
+        with:
+          global-json-file: global.json
+
+      - name: Restore dependencies
+        run: dotnet restore IMPAKT_Security_Scanner.sln
+
+      - name: Build
+        run: dotnet build IMPAKT_Security_Scanner.sln --configuration Release --no-restore --warnaserror
+
+      - name: Test
+        run: dotnet test IMPAKT_Security_Scanner.sln --configuration Release --no-build --no-restore
+
+      - name: Publish self-contained applications
+        run: bash build.sh "${{ matrix.runtime }}"
+
+      - name: Package Linux and macOS applications
+        if: runner.os != 'Windows'
+        env:
+          RUNTIME: ${{ matrix.runtime }}
+        run: |
+          mkdir -p artifacts/release
+          for project in src/*/*.csproj; do
+            application="$(basename "$project" .csproj)"
+            publish_dir="artifacts/publish/$application/$RUNTIME"
+            cp "src/$application/README.md" "$publish_dir/README.md"
+            tar -czf "artifacts/release/$application-$RUNTIME.tar.gz" -C "$publish_dir" .
+          done
+
+      - name: Package Windows applications
+        if: runner.os == 'Windows'
+        shell: pwsh
+        env:
+          RUNTIME: ${{ matrix.runtime }}
+        run: |
+          New-Item -ItemType Directory -Force -Path artifacts/release | Out-Null
+          foreach ($project in Get-ChildItem src/*/*.csproj) {
+            $application = $project.BaseName
+            $publishDir = "artifacts/publish/$application/$env:RUNTIME"
+            Copy-Item "src/$application/README.md" "$publishDir/README.md"
+            Compress-Archive -Path "$publishDir/*" -DestinationPath "artifacts/release/$application-$env:RUNTIME.zip"
+          }
+
+      - name: Store release packages
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: packages-${{ matrix.runtime }}
+          path: artifacts/release/*
+          if-no-files-found: error
+          retention-days: 7
+
+  release:
+    name: Publish GitHub release
+    needs: build
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - name: Download all release packages
+        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5
+        with:
+          pattern: packages-*
+          path: artifacts/release
+          merge-multiple: true
+
+      - name: Generate checksums
+        working-directory: artifacts/release
+        run: sha256sum *.zip *.tar.gz > SHA256SUMS.txt
+
+      - name: Create release for this build
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          tag="build-$GITHUB_RUN_NUMBER"
+          if draft="$(gh release view "$tag" --json isDraft --jq .isDraft)"; then
+            if [[ "$draft" == "false" ]]; then
+              echo "Release $tag is already published."
+              exit 0
+            fi
+          else
+            cat > release-notes.md <<EOF
+          Automatische build van main, commit $GITHUB_SHA.
+
+          Self-contained binaries voor Windows x64, Linux x64 en macOS Apple Silicon.
+          Download het archief voor de gewenste applicatie en pak de volledige inhoud uit.
+          SHA256SUMS.txt bevat de SHA-256-controlesommen van alle pakketten.
+
+          Workflow: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID
+          EOF
+            gh release create "$tag" --draft --target "$GITHUB_SHA" \
+              --title "Build $GITHUB_RUN_NUMBER (${GITHUB_SHA:0:7})" \
+              --notes-file release-notes.md
+          fi
+          gh release upload "$tag" artifacts/release/* --clobber
+          gh release edit "$tag" --draft=false
