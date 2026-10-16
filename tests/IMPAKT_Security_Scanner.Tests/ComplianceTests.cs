@@ -82,7 +82,8 @@ public class ComplianceTests
             Rules = ["c:echo \"quoted value\" -> r:^quoted value$"]
         };
         CheckResult result = RuleChecker.EvaluateCheck(check, null);
-        Assert.Equal(CheckStatus.Passed, result.Status);
+        Assert.True(result.Status == CheckStatus.Passed,
+            string.Join(Environment.NewLine, result.RuleResults.Select(rule => rule.Detail)));
     }
 
     [Fact]

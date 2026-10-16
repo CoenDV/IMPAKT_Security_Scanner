@@ -387,6 +387,7 @@ public static class RuleChecker
 
                 psi = new ProcessStartInfo("powershell.exe")
                 {
+                    RedirectStandardInput  = true,
                     RedirectStandardOutput = true,
                     RedirectStandardError  = true,
                     UseShellExecute        = false,
@@ -402,6 +403,7 @@ public static class RuleChecker
             {
                 psi = new ProcessStartInfo("/bin/sh")
                 {
+                    RedirectStandardInput  = true,
                     RedirectStandardOutput = true,
                     RedirectStandardError  = true,
                     UseShellExecute        = false,
@@ -414,6 +416,9 @@ public static class RuleChecker
             }
 
             using Process proc = Process.Start(psi)!;
+            // Rules have no input payload. Signal EOF instead of inheriting an open
+            // scanner/test-host input pipe, which can leave PowerShell waiting in CI.
+            proc.StandardInput.Close();
             // Read stdout and stderr concurrently to avoid deadlock when
             // either buffer fills, then combine them (many commands — like dscl —
             // write diagnostic output to stderr rather than stdout).

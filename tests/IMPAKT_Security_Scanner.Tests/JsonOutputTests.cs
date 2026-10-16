@@ -122,6 +122,23 @@ public sealed class JsonOutputTests : IDisposable
     }
 
     [Fact]
+    public async Task CommandRulesDoNotWaitForScannerStandardInput()
+    {
+        string command = OperatingSystem.IsWindows()
+            ? "[Console]::In.ReadToEnd(); echo \"quoted value\""
+            : "cat >/dev/null; echo \"quoted value\"";
+        string policy = WritePolicy("command.yaml", $"c:{command} -> r:^quoted value$");
+
+        // Run keeps the scanner's input pipe open, as a CI test host can do.
+        var run = await Run("--output-dir", "reports", policy);
+
+        Assert.True(run.ExitCode == 0, $"Scanner failed: {run.Output}\n{run.Error}");
+        using var json = JsonDocument.Parse(run.Output);
+        var check = json.RootElement.GetProperty("policies")[0].GetProperty("checks")[0];
+        Assert.Equal("passed", check.GetProperty("status").GetString());
+    }
+
+    [Fact]
     public void UnknownYamlConfigFieldIsRejected()
     {
         string path = Path.Combine(directory, "invalid.yml");
@@ -152,6 +169,7 @@ public sealed class JsonOutputTests : IDisposable
         var start = new ProcessStartInfo(Environment.GetEnvironmentVariable("DOTNET_HOST_PATH") ?? "dotnet")
         {
             WorkingDirectory = directory,
+            RedirectStandardInput = true,
             RedirectStandardOutput = true,
             RedirectStandardError = true,
             UseShellExecute = false
