@@ -247,7 +247,7 @@ static int ScanCommand(string policyPath, IReporter reporter, IDeserializer dese
         checkResults.Add(new ScanCheckResult
         {
             Id = check.Id,
-            Title = check.Title,
+            Title = check.DisplayTitle,
             Status = result.Status,
             Reason = result.Reason
         });

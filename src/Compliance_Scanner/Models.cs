@@ -142,7 +142,18 @@ public sealed class Requirements
 public sealed class Check
 {
     public int          Id          { get; set; }
+
+    /// <summary>Check title as used by Wazuh 4.x policies (<c>title:</c>).</summary>
     public string       Title       { get; set; } = string.Empty;
+
+    /// <summary>Check name as used by Wazuh 5.x policies (<c>name:</c>).</summary>
+    [YamlMember(Alias = "name")]
+    public string       Name        { get; set; } = string.Empty;
+
+    /// <summary>Title used in reports: <see cref="Title"/> when set, otherwise <see cref="Name"/>.</summary>
+    [YamlIgnore]
+    public string       DisplayTitle => !string.IsNullOrWhiteSpace(Title) ? Title : Name;
+
     public string       Description { get; set; } = string.Empty;
     public string       Rationale   { get; set; } = string.Empty;
     public string       Remediation { get; set; } = string.Empty;

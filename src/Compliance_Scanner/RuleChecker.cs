@@ -493,11 +493,9 @@ public static class RuleChecker
             using Microsoft.Win32.RegistryKey? key = hive.OpenSubKey(subKey);
             if (key is null)
             {
-                // If key doesn't exist and we need to check content patterns, that's invalid
-                // (2-part rules checking value existence should still FAIL)
-                if (rule.ContentConditions.Count > 0)
-                    return new RuleCheckResult { Status = CheckStatus.Invalid, Detail = $"Cannot check content: registry key not found at {keyPath}" };
-                // If key doesn't exist and we just need to check existence, it fails
+                // A missing key means the setting is not configured: the pattern cannot match,
+                // so the rule fails (same outcome as Wazuh). Marking it invalid would hide
+                // non-compliance and would also break negated rules.
                 return new RuleCheckResult { Status = CheckStatus.Failed, Detail = $"Registry key not found: {keyPath}" };
             }
 
@@ -513,15 +511,9 @@ public static class RuleChecker
             {
                 object? value = key.GetValue(rule.RegistryValueName);
                 if (value is null)
-                {
-                    // If value doesn't exist and we need to check its data, that's invalid
-                    if (rule.ContentConditions.Count > 0)
-                        return new RuleCheckResult { Status = CheckStatus.Invalid, Detail = $"Cannot check content: registry value '{rule.RegistryValueName}' not found in '{keyPath}'" };
-                    // If value doesn't exist and we just need to check its existence, it fails
                     return new RuleCheckResult { Status = CheckStatus.Failed, Detail = $"Registry value '{rule.RegistryValueName}' not found in '{keyPath}'" };
-                }
 
-                string valueStr = value.ToString() ?? string.Empty;
+                string valueStr = FormatRegistryValue(value);
 
                 // Value exists, no data pattern required
                 if (rule.ContentConditions.Count == 0)
@@ -536,7 +528,7 @@ public static class RuleChecker
             // ── Fallback: match content against all name=value pairs ──────
             System.Text.StringBuilder allValues = new();
             foreach (string name in key.GetValueNames())
-                allValues.AppendLine($"{name}={key.GetValue(name)}");
+                allValues.AppendLine($"{name}={FormatRegistryValue(key.GetValue(name))}");
 
             var (matched2, detail2) = EvaluateContent(allValues.ToString(), rule.ContentConditions, label: keyPath);
             return new RuleCheckResult { Status = matched2 ? CheckStatus.Passed : CheckStatus.Failed, Detail = detail2 };
@@ -546,6 +538,21 @@ public static class RuleChecker
             return new RuleCheckResult { Status = CheckStatus.Failed, Detail = $"Registry error: {ex.Message}" };
         }
     }
+
+    /// <summary>
+    /// Renders a registry value as text for content matching. <c>REG_MULTI_SZ</c> arrives as
+    /// <see cref="T:string[]"/> and is joined with newlines so every element can match on its
+    /// own line; <c>REG_BINARY</c> (<see cref="T:byte[]"/>) becomes an uppercase hex string.
+    /// The default <see cref="object.ToString"/> would only yield the type name
+    /// ("System.String[]"), which no pattern can ever match.
+    /// </summary>
+    internal static string FormatRegistryValue(object? value) => value switch
+    {
+        null           => string.Empty,
+        string[] items => string.Join(Environment.NewLine, items),
+        byte[] bytes   => Convert.ToHexString(bytes),
+        _              => value.ToString() ?? string.Empty
+    };
 
     // =========================================================================
     // Content evaluation  (shared by File, Directory, Command, Registry)

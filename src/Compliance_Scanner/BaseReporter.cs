@@ -145,7 +145,7 @@ public abstract class BaseReporter : IReporter
         WriteLine(new string('─', 68));
 
         Write($"  [#{check.Id,-4}] ", ConsoleColor.DarkGray);
-        WriteLine(check.Title, ConsoleColor.Yellow);
+        WriteLine(check.DisplayTitle, ConsoleColor.Yellow);
 
         if (!string.IsNullOrWhiteSpace(check.Description))
             WriteLine($"           Description : {check.Description}");
