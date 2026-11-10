@@ -19,7 +19,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\src\Syscollector\Syscollector.csproj" />
     <ProjectReference Include="..\..\src\Sftp_Uploader\Sftp_Uploader.csproj" />
     <ProjectReference Include="..\..\src\Compliance_Scanner\Compliance_Scanner.csproj" />
   </ItemGroup>

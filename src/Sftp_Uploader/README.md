@@ -6,8 +6,8 @@ Kopieer `sftp-config.example.yml` naar een lokaal `sftp-config.yml` (of genereer
 
 ```sh
 dotnet run --project src/Sftp_Uploader -- --write-config sftp-config.yml
-dotnet run --project src/Sftp_Uploader -- --config sftp-config.yml --file results/patches.json --dry-run
-dotnet run --project src/Sftp_Uploader -- --config sftp-config.yml --directory results/compliance --file results/patches.json
+dotnet run --project src/Sftp_Uploader -- --config sftp-config.yml --file results/compliance/report.json --dry-run
+dotnet run --project src/Sftp_Uploader -- --config sftp-config.yml --directory results/compliance
 ```
 
 CLI-opties overschrijven de YAML-configuratie. Omgevingsvariabelen: `SFTP_HOST`, `SFTP_USER`, `SFTP_PASS`, `SFTP_HOST_KEY`, `SFTP_PATH`. Er worden geen wachtwoorden in commandoregelargumenten of YAML-configuratie opgeslagen. De client controleert de serverfingerprint vóór authenticatie.
