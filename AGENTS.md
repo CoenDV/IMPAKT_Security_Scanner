@@ -109,7 +109,7 @@ dotnet test IMPAKT_Security_Scanner.sln --configuration Release
 dotnet run --project src/Compliance_Scanner -- --output-dir results/compliance src/Compliance_Scanner/Policies/
 dotnet run --project src/Sftp_Uploader -- --config sftp-config.yml --directory results/compliance --dry-run
 
-# Publish self-contained single-file packages (win-x64, linux-x64, osx-arm64)
+# Publish self-contained single-file binaries (win-x64, linux-x64, osx-arm64)
 ./build.sh win-x64
 ./build.sh linux-x64 Sftp_Uploader
 ```
