@@ -111,14 +111,6 @@ jobs:
             cat > release-notes.md <<EOF
           Automatische build van main, commit $GITHUB_SHA.
 
-          Eén self-contained binary per applicatie per platform, met de naam Applicatie-runtime
-          (met .exe op Windows). Er zijn geen archieven en geen losse runtime-bestanden nodig.
-
-          Op Linux en macOS eerst uitvoerbaar maken: chmod +x <bestand>.
-          Policies worden niet meegeleverd; de officiële Wazuh-bron staat in
-          src/Compliance_Scanner/Policies/CIS/README.md in de repository.
-          SHA256SUMS.txt bevat de SHA-256-controlesommen van alle bestanden.
-
           Workflow: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID
           EOF
             gh release create "$tag" --draft --target "$GITHUB_SHA" \
