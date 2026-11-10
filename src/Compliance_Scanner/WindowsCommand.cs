@@ -7,9 +7,10 @@ namespace Compliance_Scanner;
 /// executed by <see cref="RuleChecker"/> on Windows.
 /// </summary>
 /// <remarks>
-/// Wazuh runs command rules through cmd.exe, so policies contain forms like
-/// <c>powershell -NoProfile -Command "Get-Date"</c> or <c>cmd /c powershell "Get-Date"</c>.
-/// The scanner runs every command as a PowerShell script instead, which means the
+/// Wazuh executes command rules without a shell: the command string is tokenized and
+/// passed directly to execvp()/CreateProcessW(), so policies spell out the executable,
+/// e.g. <c>powershell -NoProfile -Command "Get-Date"</c> or <c>cmd /c powershell "Get-Date"</c>.
+/// This scanner runs every command rule as a PowerShell script instead, which means the
 /// executable prefix and its switches must be removed before the remaining script is
 /// passed to <c>-EncodedCommand</c>. Without this translation PowerShell would try to
 /// parse <c>-NoProfile -Command "…"</c> as a script and fail with a CLIXML error dump.
