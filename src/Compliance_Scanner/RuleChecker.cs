@@ -374,15 +374,9 @@ public static class RuleChecker
             ProcessStartInfo psi;
             if (OperatingSystem.IsWindows())
             {
-                // Always use PowerShell on Windows for consistency and to support full paths
-                // like "%WINDIR%\SysNative\WindowsPowerShell\v1.0\powershell <args>"
-                // Expand Windows-style %VAR% environment variables (cmd.exe syntax)
-                // so they work in PowerShell
-                string expandedTarget = Environment.ExpandEnvironmentVariables(rule.Target);
-
-                // If the command itself is a path to powershell.exe, extract just the arguments
-                // (e.g., "C:\Windows\...\powershell.exe secedit /export ..." -> "secedit /export ...")
-                string commandToRun = ExtractPowerShellArguments(expandedTarget) ?? expandedTarget;
+                // Wazuh runs command rules through cmd.exe; translate the rule into the
+                // PowerShell script this scanner executes (see WindowsCommand).
+                string commandToRun = WindowsCommand.ToPowerShellScript(rule.Target);
                 string encodedCommand = Convert.ToBase64String(Encoding.Unicode.GetBytes(commandToRun));
 
                 psi = new ProcessStartInfo("powershell.exe")
@@ -689,31 +683,4 @@ public static class RuleChecker
             _                  => $"{bytes / (1024.0 * 1024):F1} MB"
         };
 
-    /// <summary>
-    /// If the command is a full path to powershell.exe, extract just the arguments.
-    /// For example: "C:\Windows\...\powershell.exe secedit /export ..." returns "secedit /export ..."
-    /// Returns null if the command is not a PowerShell path (should use original command).
-    /// </summary>
-    private static string? ExtractPowerShellArguments(string command)
-    {
-        // Match paths ending with "powershell" or "powershell.exe" (case-insensitive)
-        // Look for the last occurrence to handle paths with spaces
-        int psIndex = command.LastIndexOf("powershell", StringComparison.OrdinalIgnoreCase);
-        if (psIndex < 0) return null;
-
-        // Check if it's "powershell.exe" or just "powershell"
-        int endIndex = psIndex + "powershell".Length;
-        if (endIndex < command.Length && command[endIndex..].StartsWith(".exe", StringComparison.OrdinalIgnoreCase))
-            endIndex += 4;
-
-        // Extract everything after "powershell" or "powershell.exe"
-        if (endIndex < command.Length)
-        {
-            string remainder = command[endIndex..].TrimStart();
-            if (!string.IsNullOrEmpty(remainder))
-                return remainder;
-        }
-
-        return null;
-    }
 }
