@@ -14,6 +14,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <InternalsVisibleTo Include="IMPAKT_Security_Scanner.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
     <None Update="Policies\**\*.yaml">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>

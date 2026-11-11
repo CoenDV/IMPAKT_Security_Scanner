@@ -53,8 +53,7 @@ jobs:
       - name: Publish self-contained applications
         run: bash build.sh "${{ matrix.runtime }}"
 
-      - name: Package Linux and macOS applications
-        if: runner.os != 'Windows'
+      - name: Collect application binaries
         env:
           RUNTIME: ${{ matrix.runtime }}
         run: |
@@ -62,28 +61,17 @@ jobs:
           for project in src/*/*.csproj; do
             application="$(basename "$project" .csproj)"
             publish_dir="artifacts/publish/$application/$RUNTIME"
-            cp "src/$application/README.md" "$publish_dir/README.md"
-            tar -czf "artifacts/release/$application-$RUNTIME.tar.gz" -C "$publish_dir" .
+            if [[ -f "$publish_dir/$application.exe" ]]; then
+              cp "$publish_dir/$application.exe" "artifacts/release/$application-$RUNTIME.exe"
+            else
+              cp "$publish_dir/$application" "artifacts/release/$application-$RUNTIME"
+            fi
           done
 
-      - name: Package Windows applications
-        if: runner.os == 'Windows'
-        shell: pwsh
-        env:
-          RUNTIME: ${{ matrix.runtime }}
-        run: |
-          New-Item -ItemType Directory -Force -Path artifacts/release | Out-Null
-          foreach ($project in Get-ChildItem src/*/*.csproj) {
-            $application = $project.BaseName
-            $publishDir = "artifacts/publish/$application/$env:RUNTIME"
-            Copy-Item "src/$application/README.md" "$publishDir/README.md"
-            Compress-Archive -Path "$publishDir/*" -DestinationPath "artifacts/release/$application-$env:RUNTIME.zip"
-          }
-
-      - name: Store release packages
+      - name: Store release binaries
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: packages-${{ matrix.runtime }}
+          name: binaries-${{ matrix.runtime }}
           path: artifacts/release/*
           if-no-files-found: error
           retention-days: 7
@@ -97,16 +85,16 @@ jobs:
     permissions:
       contents: write
     steps:
-      - name: Download all release packages
+      - name: Download all release binaries
         uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5
         with:
-          pattern: packages-*
+          pattern: binaries-*
           path: artifacts/release
           merge-multiple: true
 
       - name: Generate checksums
         working-directory: artifacts/release
-        run: sha256sum *.zip *.tar.gz > SHA256SUMS.txt
+        run: sha256sum -b * > SHA256SUMS.txt
 
       - name: Create release for this build
         env:
@@ -122,10 +110,6 @@ jobs:
           else
             cat > release-notes.md <<EOF
           Automatische build van main, commit $GITHUB_SHA.
-
-          Self-contained binaries voor Windows x64, Linux x64 en macOS Apple Silicon.
-          Download het archief voor de gewenste applicatie en pak de volledige inhoud uit.
-          SHA256SUMS.txt bevat de SHA-256-controlesommen van alle pakketten.
 
           Workflow: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID
           EOF

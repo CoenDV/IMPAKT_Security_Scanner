@@ -25,3 +25,5 @@ CIS Windows Server-benchmarks bestaan per OS als twee bestanden: `cis_win<jaar>_
 Rapportverzending gaat via de aparte `Sftp_Uploader`. CIS-benchmarks zijn eigendom van Wazuh en worden niet in deze repository meegeleverd; zie `Policies/CIS/README.md` voor de officiële Wazuh-bron.
 
 Exitcodes: `0` bij een scan zonder gefaalde checks; `1` bij gefaalde checks, niet-gehaalde requirements of fouten, inclusief YAML-parsefouten tijdens policyselectie. Controleer policies vóór gebruik: commandoregels worden op het doelsysteem uitgevoerd met de rechten van de gebruiker.
+
+Op Windows voert de scanner elke `c:`-regel uit als PowerShell-script. Veelgebruikte Wazuh-vormen worden daarbij automatisch omgezet: `powershell -NoProfile -Command "…"`, `powershell.exe …` (ook met volledig pad en `%VARIABELE%`), `cmd /c …` en `-EncodedCommand`. Gepubliceerde CIS-policies kun je daardoor ongewijzigd gebruiken; `--display-details` toont per regel welke uitvoer is verkregen.

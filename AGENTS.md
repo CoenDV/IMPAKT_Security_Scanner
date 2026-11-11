@@ -1,7 +1,7 @@
 # AGENTS.md — Project Instructions & Guidelines
 
 ## 1. Project Overview
-`IMPAKT_Security_Scanner` is a multi-project .NET 10 (`net10.0`) repository containing standalone, single-purpose C# console applications for security compliance scanning, patch/update inventory collection, and secure report transport.
+`IMPAKT_Security_Scanner` is a multi-project .NET 10 (`net10.0`) repository containing standalone, single-purpose C# console applications for security compliance scanning and secure report transport.
 
 ### Repository Layout
 ```text
@@ -11,7 +11,6 @@ global.json                    # Pins .NET SDK 10.0.100 (rollForward: latestFeat
 build.sh / build.ps1           # Release build & self-contained single-file publish scripts
 src/
   Compliance_Scanner/          # Wazuh SCA YAML compliance scanner
-  Syscollector/                # Cross-platform installed & available patch/update collector
   Sftp_Uploader/               # Standalone SFTP report uploader with host-key verification
 tests/
   IMPAKT_Security_Scanner.Tests/ # xUnit test suite covering all applications
@@ -34,7 +33,7 @@ tools/                         # Helper scripts (split_cis_dc_ms.py: CIS Windows
 ## 3. Architecture & Multi-Package Rules
 - **Single-purpose executables:** Keep every console application under `src/<Application>/` independently buildable and publishable.
 - **Strict decoupling:**
-  - Scanners (`Compliance_Scanner`, `Syscollector`, and any future scanners/collectors) must **never** reference `Sftp_Uploader` or `SSH.NET`.
+  - Scanners (`Compliance_Scanner` and any future scanners/collectors) must **never** reference `Sftp_Uploader` or `SSH.NET`.
   - Scanners only collect evidence and write local JSON reports and text logs; transport or downstream ingestion (e.g. ESB/Pipeline package) is handled as a separate step.
 - **Adding a new console application:**
   1. Create `src/<AppName>/<AppName>.csproj` (`<OutputType>Exe</OutputType>`). Rely on `Directory.Build.props` for `TargetFramework`, `Nullable`, and `ImplicitUsings`.
@@ -51,7 +50,7 @@ tools/                         # Helper scripts (split_cis_dc_ms.py: CIS Windows
   - Every application in this repository uses **YAML** (`YamlDotNet` with `UnderscoredNamingConvention`) for configuration files (`-c, --config <path.yml>` and `--write-config [path.yml]`).
   - CLI arguments always override YAML configuration values.
 - **Output is always JSON (reports) + Text (logging):**
-  - Scanners (`Compliance_Scanner`, `Syscollector`) output structured **JSON** only (written to a `.json` file and `stdout` for consumption by an ESB/Pipeline package).
+  - Scanners (`Compliance_Scanner`) output structured **JSON** only (written to a `.json` file and `stdout` for consumption by an ESB/Pipeline package).
   - All human-readable progress, banners, warnings, and operational diagnostics are written as **text logs** to `stderr` (`Console.Error`) and `.log` files (`-l, --log <path.log>` / `log_file`).
 - **JSON serialization:**
   - Use `System.Text.Json` with `PropertyNamingPolicy = JsonNamingPolicy.CamelCase` and `WriteIndented = true`.
@@ -61,7 +60,7 @@ tools/                         # Helper scripts (split_cis_dc_ms.py: CIS Windows
   - Sanitize `Environment.MachineName` (replace `Path.GetInvalidFileNameChars()` with `_`) when constructing default report/log filenames.
   - On Unix (Linux/macOS), restrict permissions on output directories (`750`) and generated report/log files (`644`).
 - **Exit codes:**
-  - `0`: Success (`Compliance_Scanner`: all applicable checks passed with no errors; `Syscollector`: both `installed` and `available` sections succeeded; `Sftp_Uploader`: all files uploaded or `--dry-run` validated).
+  - `0`: Success (`Compliance_Scanner`: all applicable checks passed with no errors; `Sftp_Uploader`: all files uploaded or `--dry-run` validated).
   - `1`: Any failed compliance check, unmet policy requirement, collection error, upload failure, or invalid CLI/config argument.
 
 ---
@@ -93,17 +92,6 @@ Evaluates system compliance against Wazuh SCA YAML policies.
   - `JsonReport.cs`: Serializable JSON report (`ComplianceReport`, `PolicyReport`, `CheckEvidence`, `RuleEvidence`).
   - `IReporter.cs` / `BaseReporter.cs` / `ConsoleReporter.cs` / `FileReporter.cs` / `CompositeReporter.cs`: Text logging to `stderr` and `.log` file.
 
-### `src/Syscollector`
-Collects installed and available OS/package updates into a JSON report (`SystemReport`) and text log.
-- **Core components:**
-  - `SyscollectorConfig.cs`: YAML configuration loader and template generator (`output_dir`, `report_file`, `log_file`, `timeout_seconds`, `max_cache_age_days`).
-  - `CommandRunner.cs`: `ICommandRunner` interface, process execution with timeout and `LC_ALL=C`, and Linux package cache timestamp inspection (`GetMetadataTimestampUtc`).
-  - `UpdateCollector.cs`: Collects `installed` and `available` sections independently:
-    - **Windows:** Windows Update Agent COM API (`Microsoft.Update.Session`) via PowerShell (`$searcher.Online = $false` for offline `installed` search; configured update service/WSUS for `available`).
-    - **Linux (Debian/Ubuntu):** `dpkg-query -W` (installed) and `apt list --upgradable` (available) with cache staleness reporting (`MetadataTimestampUtc`, `IsMetadataStale`).
-    - **Linux (RHEL/Fedora):** `rpm -qa` (installed) and `dnf --cacheonly -q check-update` (available; handles exit code `100` and `Obsoleting Packages` sections) with cache staleness reporting.
-    - **macOS:** `system_profiler SPInstallHistoryDataType -json` (installed) and `softwareupdate --list` (available).
-
 ### `src/Sftp_Uploader`
 Uploads generated report files to an SFTP server.
 - **Core components:**
@@ -120,10 +108,9 @@ dotnet test IMPAKT_Security_Scanner.sln --configuration Release
 
 # Run individual applications
 dotnet run --project src/Compliance_Scanner -- --output-dir results/compliance src/Compliance_Scanner/Policies/
-dotnet run --project src/Syscollector -- --output results/patches.json
-dotnet run --project src/Sftp_Uploader -- --config sftp-config.yml --file results/patches.json --dry-run
+dotnet run --project src/Sftp_Uploader -- --config sftp-config.yml --directory results/compliance --dry-run
 
-# Publish self-contained single-file packages (win-x64, linux-x64, osx-arm64)
+# Publish self-contained single-file binaries (win-x64, linux-x64, osx-arm64)
 ./build.sh win-x64
-./build.sh linux-x64 Syscollector
+./build.sh linux-x64 Sftp_Uploader
 ```

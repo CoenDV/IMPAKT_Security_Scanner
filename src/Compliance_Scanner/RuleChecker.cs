@@ -514,9 +514,8 @@ public static class RuleChecker
                 {
                     // A missing value is a normal "condition not met" (Failed), not an error (Invalid)
                     return new RuleCheckResult { Status = CheckStatus.Failed, Detail = $"Registry value '{rule.RegistryValueName}' not found in '{keyPath}'" };
-                }
 
-                string valueStr = value.ToString() ?? string.Empty;
+                string valueStr = FormatRegistryValue(value);
 
                 // Value exists, no data pattern required
                 if (rule.ContentConditions.Count == 0)
@@ -531,7 +530,7 @@ public static class RuleChecker
             // ── Fallback: match content against all name=value pairs ──────
             System.Text.StringBuilder allValues = new();
             foreach (string name in key.GetValueNames())
-                allValues.AppendLine($"{name}={key.GetValue(name)}");
+                allValues.AppendLine($"{name}={FormatRegistryValue(key.GetValue(name))}");
 
             var (matched2, detail2) = EvaluateContent(allValues.ToString(), rule.ContentConditions, label: keyPath);
             return new RuleCheckResult { Status = matched2 ? CheckStatus.Passed : CheckStatus.Failed, Detail = detail2 };
@@ -541,6 +540,21 @@ public static class RuleChecker
             return new RuleCheckResult { Status = CheckStatus.Failed, Detail = $"Registry error: {ex.Message}" };
         }
     }
+
+    /// <summary>
+    /// Renders a registry value as text for content matching. <c>REG_MULTI_SZ</c> arrives as
+    /// <see cref="T:string[]"/> and is joined with newlines so every element can match on its
+    /// own line; <c>REG_BINARY</c> (<see cref="T:byte[]"/>) becomes an uppercase hex string.
+    /// The default <see cref="object.ToString"/> would only yield the type name
+    /// ("System.String[]"), which no pattern can ever match.
+    /// </summary>
+    internal static string FormatRegistryValue(object? value) => value switch
+    {
+        null           => string.Empty,
+        string[] items => string.Join(Environment.NewLine, items),
+        byte[] bytes   => Convert.ToHexString(bytes),
+        _              => value.ToString() ?? string.Empty
+    };
 
     // =========================================================================
     // Content evaluation  (shared by File, Directory, Command, Registry)
