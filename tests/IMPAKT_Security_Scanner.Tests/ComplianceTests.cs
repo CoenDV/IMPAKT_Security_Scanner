@@ -52,6 +52,39 @@ public class ComplianceTests
     }
 
     [Fact]
+    public void PowerShellProgressClixmlIsDroppedFromStderr()
+    {
+        const string progressOnly = "#< CLIXML\r\n<Objs Version=\"1.1.0.1\" xmlns=\"http://schemas.microsoft.com/powershell/2004/04\">" +
+            "<Obj S=\"progress\" RefId=\"0\"><MS><I64 N=\"SourceId\">1</I64><PR N=\"Record\"><AV>Preparing modules for first use.</AV></PR></MS></Obj></Objs>";
+
+        Assert.Equal("", RuleChecker.PowerShellStderrToText(progressOnly));
+    }
+
+    [Fact]
+    public void PowerShellErrorClixmlBecomesReadableText()
+    {
+        const string error = "#< CLIXML\r\n<Objs Version=\"1.1.0.1\" xmlns=\"http://schemas.microsoft.com/powershell/2004/04\">" +
+            "<S S=\"Error\">Get-Item : Cannot find path 'C:\\x' because it does not exist._x000D__x000A_</S>" +
+            "<S S=\"Error\">At line:1 char:1_x000D__x000A_</S></Objs>";
+
+        string text = RuleChecker.PowerShellStderrToText(error);
+
+        Assert.Contains("Cannot find path 'C:\\x' because it does not exist.", text);
+        Assert.DoesNotContain("CLIXML", text);
+        Assert.Equal("plain stderr", RuleChecker.PowerShellStderrToText("plain stderr"));
+    }
+
+    [Fact]
+    public void PowerShellErrorsAreReadableInCommandRulesOnWindows()
+    {
+        if (!OperatingSystem.IsWindows()) return;
+
+        var check = new Check { Id = 1, Condition = "all", Rules = [@"c:Get-Item C:\impakt-no-such-path -> r:Cannot find path"] };
+
+        Assert.Equal(CheckStatus.Passed, RuleChecker.EvaluateCheck(check, null).Status);
+    }
+
+    [Fact]
     public void PolicyReadsNameOfRequirementsAndChecks()
     {
         const string yaml = """

@@ -376,7 +376,9 @@ public static class RuleChecker
 
                 // If the command itself is a path to powershell.exe, extract just the arguments
                 // (e.g., "C:\Windows\...\powershell.exe secedit /export ..." -> "secedit /export ...")
-                string commandToRun = ExtractPowerShellArguments(expandedTarget) ?? expandedTarget;
+                // Progress output would otherwise end up on stderr as CLIXML.
+                string commandToRun = "$ProgressPreference = 'SilentlyContinue'; "
+                    + (ExtractPowerShellArguments(expandedTarget) ?? expandedTarget);
                 string encodedCommand = Convert.ToBase64String(Encoding.Unicode.GetBytes(commandToRun));
 
                 psi = new ProcessStartInfo("powershell.exe")
@@ -428,7 +430,7 @@ public static class RuleChecker
             }
 
             string stdout = stdoutTask.Result;
-            string stderr = stderrTask.Result;
+            string stderr = OperatingSystem.IsWindows() ? PowerShellStderrToText(stderrTask.Result) : stderrTask.Result;
             string output = string.IsNullOrEmpty(stdout)
                 ? stderr
                 : string.IsNullOrEmpty(stderr)
@@ -675,6 +677,29 @@ public static class RuleChecker
             < 1024 * 1024      => $"{bytes / 1024.0:F1} KB",
             _                  => $"{bytes / (1024.0 * 1024):F1} MB"
         };
+
+    /// <summary>
+    /// With -EncodedCommand, PowerShell writes errors and progress to stderr as CLIXML ("#&lt; CLIXML ...").
+    /// Returns the error/warning text from it, or "" when it only held progress. Other text is returned as is.
+    /// </summary>
+    public static string PowerShellStderrToText(string stderr)
+    {
+        const string header = "#< CLIXML";
+        if (!stderr.StartsWith(header, StringComparison.Ordinal)) return stderr;
+
+        try
+        {
+            var root = System.Xml.Linq.XElement.Parse("<root>" + stderr.Replace(header, "") + "</root>");
+            IEnumerable<string> messages = root.Descendants()
+                .Where(e => e.Name.LocalName == "S" && (string?)e.Attribute("S") is "Error" or "warning")
+                .Select(e => Regex.Replace(e.Value, "_x([0-9A-Fa-f]{4})_", m => ((char)Convert.ToInt32(m.Groups[1].Value, 16)).ToString()));
+            return string.Concat(messages).Trim();
+        }
+        catch (System.Xml.XmlException)
+        {
+            return stderr;
+        }
+    }
 
     /// <summary>
     /// If the command is a full path to powershell.exe, extract just the arguments.
