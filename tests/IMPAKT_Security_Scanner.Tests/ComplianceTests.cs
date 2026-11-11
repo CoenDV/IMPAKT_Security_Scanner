@@ -21,6 +21,55 @@ public class ComplianceTests
     }
 
     [Fact]
+    public void PolicyReadsNameOfRequirementsAndChecks()
+    {
+        const string yaml = """
+            policy: { id: "p", file: "p.yml", name: "P", description: "d" }
+            requirements:
+              name: "Needs Windows"
+              condition: all
+              rules: ["c:cmd /c ver -> r:Windows"]
+            checks:
+              - id: 1
+                name: "Ensure the thing"
+                condition: all
+                rules: ["f:/etc/hosts"]
+            """;
+        var deserializer = new YamlDotNet.Serialization.DeserializerBuilder()
+            .WithNamingConvention(YamlDotNet.Serialization.NamingConventions.UnderscoredNamingConvention.Instance)
+            .IgnoreUnmatchedProperties()
+            .Build();
+
+        SCAPolicy policy = deserializer.Deserialize<SCAPolicy>(yaml);
+
+        Assert.Equal("Needs Windows", policy.Requirements!.Name);
+        Assert.Equal("Ensure the thing", policy.Checks[0].Name);
+    }
+
+    [Fact]
+    public void ChecksWithoutNameAreReportedSoAnOldTitleKeyDoesNotFailSilently()
+    {
+        const string yaml = """
+            policy: { id: "p", file: "p.yml", name: "P", description: "d" }
+            checks:
+              - id: 1
+                name: "Has a name"
+                rules: ["f:/etc/hosts"]
+              - id: 2
+                title: "Old style key, silently ignored"
+                rules: ["f:/etc/hosts"]
+            """;
+        var deserializer = new YamlDotNet.Serialization.DeserializerBuilder()
+            .WithNamingConvention(YamlDotNet.Serialization.NamingConventions.UnderscoredNamingConvention.Instance)
+            .IgnoreUnmatchedProperties()
+            .Build();
+
+        SCAPolicy policy = deserializer.Deserialize<SCAPolicy>(yaml);
+
+        Assert.Equal([2], policy.CheckIdsWithoutName());
+    }
+
+    [Fact]
     public void GeneratedScannerConfigContainsOnlyComplianceSettings()
     {
         string path = Path.GetTempFileName();

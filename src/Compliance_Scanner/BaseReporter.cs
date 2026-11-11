@@ -96,7 +96,7 @@ public abstract class BaseReporter : IReporter
         if (Level == OutputLevel.Compact) return;
 
         WriteLine("══ Requirements " + new string('═', 52), ConsoleColor.Cyan);
-        WriteLine($"  {requirementsCheck.Title}");
+        WriteLine($"  {requirementsCheck.Name}");
         if (!string.IsNullOrWhiteSpace(requirementsCheck.Description))
             WriteLine($"  {requirementsCheck.Description}");
 
@@ -145,7 +145,7 @@ public abstract class BaseReporter : IReporter
         WriteLine(new string('─', 68));
 
         Write($"  [#{check.Id,-4}] ", ConsoleColor.DarkGray);
-        WriteLine(check.Title, ConsoleColor.Yellow);
+        WriteLine(check.Name, ConsoleColor.Yellow);
 
         if (!string.IsNullOrWhiteSpace(check.Description))
             WriteLine($"           Description : {check.Description}");
