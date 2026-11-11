@@ -21,8 +21,8 @@ checks:
     remediation: "Install the latest Windows updates through Windows Update or by manually downloading and installing the latest hotfixes from Microsoft KB articles."
     condition: all
     rules:
-      - 'c:cmd /c powershell "(Get-HotFix | Sort-Object InstalledOn -Descending | Select-Object -First 1).InstalledOn.ToString(\"MM-dd-yyyy\")" -> r:\d{2}-\d{2}-\d{4}'
-      - 'c:cmd /c powershell "[Math]::Floor(((Get-Date) - (Get-HotFix | Sort-Object InstalledOn -Descending | Select-Object -First 1).InstalledOn).TotalDays)" -> n:^(\d+) compare <= 180'
+      - 'c:(Get-HotFix | Sort-Object InstalledOn -Descending | Select-Object -First 1).InstalledOn.ToString(''MM-dd-yyyy'') -> r:\d{2}-\d{2}-\d{4}'
+      - 'c:[Math]::Floor(((Get-Date) - (Get-HotFix | Sort-Object InstalledOn -Descending | Select-Object -First 1).InstalledOn).TotalDays) -> n:^(\d+) compare <= 180'
 
   - id: 99999
     name: "Ensure system has been restarted within the last year"
@@ -31,5 +31,5 @@ checks:
     remediation: "Schedule a system restart or perform a manual restart during a maintenance window to keep the system current."
     condition: all
     rules:
-      - 'c:cmd /c powershell "(Get-Date) - (Get-CimInstance -ClassName Win32_OperatingSystem).LastBootUpTime | Select-Object -ExpandProperty Days" -> r:\d+'
-      - 'c:cmd /c powershell "[Math]::Floor(((Get-Date) - (Get-CimInstance -ClassName Win32_OperatingSystem).LastBootUpTime).TotalDays)" -> n:^(\d+) compare < 365'
+      - 'c:(Get-Date) - (Get-CimInstance -ClassName Win32_OperatingSystem).LastBootUpTime | Select-Object -ExpandProperty Days -> r:\d+'
+      - 'c:[Math]::Floor(((Get-Date) - (Get-CimInstance -ClassName Win32_OperatingSystem).LastBootUpTime).TotalDays) -> n:^(\d+) compare < 365'
