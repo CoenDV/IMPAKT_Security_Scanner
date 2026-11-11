@@ -215,10 +215,7 @@ public static class RuleChecker
 
         if (foundFile is null)
         {
-            // If the file doesn't exist and we need to check its content, that's invalid
-            if (rule.HasContentCheck)
-                return new RuleCheckResult { Status = CheckStatus.Invalid, Detail = $"Cannot check content: file not found at {rule.Target}" };
-            // If the file doesn't exist and we just need to check existence, it fails
+            // A missing file is a normal "condition not met" (Failed), not an error (Invalid)
             return new RuleCheckResult { Status = CheckStatus.Failed, Detail = $"File not found: {rule.Target}" };
         }
 
@@ -276,10 +273,7 @@ public static class RuleChecker
 
         if (foundDir is null)
         {
-            // If the directory doesn't exist and we need to check content, that's invalid
-            if (rule.HasContentCheck)
-                return new RuleCheckResult { Status = CheckStatus.Invalid, Detail = $"Cannot check content: directory not found at {rule.Target}" };
-            // If the directory doesn't exist and we just need to check existence, it fails
+            // A missing directory is a normal "condition not met" (Failed), not an error (Invalid)
             return new RuleCheckResult { Status = CheckStatus.Failed, Detail = $"Directory not found: {rule.Target}" };
         }
 
@@ -499,11 +493,7 @@ public static class RuleChecker
             using Microsoft.Win32.RegistryKey? key = hive.OpenSubKey(subKey);
             if (key is null)
             {
-                // If key doesn't exist and we need to check content patterns, that's invalid
-                // (2-part rules checking value existence should still FAIL)
-                if (rule.ContentConditions.Count > 0)
-                    return new RuleCheckResult { Status = CheckStatus.Invalid, Detail = $"Cannot check content: registry key not found at {keyPath}" };
-                // If key doesn't exist and we just need to check existence, it fails
+                // A missing key is a normal "condition not met" (Failed), not an error (Invalid)
                 return new RuleCheckResult { Status = CheckStatus.Failed, Detail = $"Registry key not found: {keyPath}" };
             }
 
@@ -520,10 +510,7 @@ public static class RuleChecker
                 object? value = key.GetValue(rule.RegistryValueName);
                 if (value is null)
                 {
-                    // If value doesn't exist and we need to check its data, that's invalid
-                    if (rule.ContentConditions.Count > 0)
-                        return new RuleCheckResult { Status = CheckStatus.Invalid, Detail = $"Cannot check content: registry value '{rule.RegistryValueName}' not found in '{keyPath}'" };
-                    // If value doesn't exist and we just need to check its existence, it fails
+                    // A missing value is a normal "condition not met" (Failed), not an error (Invalid)
                     return new RuleCheckResult { Status = CheckStatus.Failed, Detail = $"Registry value '{rule.RegistryValueName}' not found in '{keyPath}'" };
                 }
 

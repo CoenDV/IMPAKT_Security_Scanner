@@ -21,6 +21,37 @@ public class ComplianceTests
     }
 
     [Fact]
+    public void MissingFileWithContentCheckFailsInsteadOfBeingInvalid()
+    {
+        string missing = Path.Combine(Path.GetTempPath(), "impakt-missing-" + Guid.NewGuid().ToString("N"));
+
+        var positive = RuleChecker.EvaluateCheck(
+            new Check { Id = 1, Condition = "all", Rules = [$"f:{missing} -> r:abc"] }, null);
+        Assert.Equal(CheckStatus.Failed, positive.Status);
+        Assert.False(positive.RuleResults[0].Invalid);
+
+        var negated = RuleChecker.EvaluateCheck(
+            new Check { Id = 2, Condition = "all", Rules = [$"not f:{missing} -> r:abc"] }, null);
+        Assert.Equal(CheckStatus.Passed, negated.Status);
+    }
+
+    [Fact]
+    public void MissingRegistryValueFailsInsteadOfBeingInvalid()
+    {
+        if (!OperatingSystem.IsWindows()) return;
+        const string key = @"HKEY_LOCAL_MACHINE\SOFTWARE\ImpaktNoSuchKey";
+
+        var positive = RuleChecker.EvaluateCheck(
+            new Check { Id = 1, Condition = "all", Rules = [$"r:{key} -> Value -> 1"] }, null);
+        Assert.Equal(CheckStatus.Failed, positive.Status);
+        Assert.False(positive.RuleResults[0].Invalid);
+
+        var negated = RuleChecker.EvaluateCheck(
+            new Check { Id = 2, Condition = "all", Rules = [$"not r:{key} -> Value -> 1"] }, null);
+        Assert.Equal(CheckStatus.Passed, negated.Status);
+    }
+
+    [Fact]
     public void PolicyReadsNameOfRequirementsAndChecks()
     {
         const string yaml = """
