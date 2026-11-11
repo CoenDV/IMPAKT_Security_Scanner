@@ -14,6 +14,14 @@ Hetzelfde JSON-document verschijnt op `stdout` (voor verwerking door een ESB/Pip
 
 Het JSON-document bevat `schemaVersion`, scanner, host, besturingssysteem, doelpad, UTC-tijden, exitcode, policyselectie (`discovery`), uitgevoerde policies en samenvattingen. Per policy zijn metadata, requirements en checkresultaten beschikbaar. Checks bevatten beschrijving, rationale, remediation, conditie, status, reden en de afzonderlijke regels met uitvoerdetails. Statuswaarden zijn leesbare strings, zoals `passed`, `failed` en `invalid`. Bij een mapscan staan alle uitgevoerde policies in één rapport; niet-toepasselijke en onleesbare policies staan in `discovery`. Ook bij scan- of policyfouten wordt JSON geschreven als de uitvoerlocatie toegankelijk is.
 
+## Policies
+
+Policies volgen het Wazuh SCA-formaat. Checks en `requirements` hebben een `name:` (niet `title:`; een check zonder `name:` geeft een waarschuwing). Een `c:`-regel draait op Windows al in PowerShell: schrijf direct PowerShell en geen geneste `powershell ...`- of `cmd /c powershell ...`-aanroep, want die wordt niet goed uitgevoerd.
+
+Status `invalid` betekent dat een regel niet uitgevoerd kon worden (timeout, geen toegang, kapotte regel, niet-ondersteund platform). Een ontbrekend bestand, map of registerwaarde is gewoon `failed` (met `not` juist `passed`).
+
+CIS Windows Server-benchmarks bestaan per OS als twee bestanden: `cis_win<jaar>_ms.yml` (member server) en `cis_win<jaar>_dc.yml` (Domain Controller). Een extra requirement op `ProductType` (`ServerNT` of `LanmanNT`) laat de scanner het juiste bestand kiezen. Maak ze uit het Wazuh-bestand met `python3 tools/split_cis_dc_ms.py cis_win2022.yml` en verwijder daarna het origineel. Het script zet ook geneste `c:powershell ...`-regels om naar directe PowerShell en stopt bij een onbekende vorm. De bestanden staan in `.gitignore`.
+
 Rapportverzending gaat via de aparte `Sftp_Uploader`. CIS-benchmarks zijn eigendom van Wazuh en worden niet in deze repository meegeleverd; zie `Policies/CIS/README.md` voor de officiële Wazuh-bron.
 
 Exitcodes: `0` bij een scan zonder gefaalde checks; `1` bij gefaalde checks, niet-gehaalde requirements of fouten, inclusief YAML-parsefouten tijdens policyselectie. Controleer policies vóór gebruik: commandoregels worden op het doelsysteem uitgevoerd met de rechten van de gebruiker.
