@@ -56,7 +56,7 @@ public sealed record CheckEvidence(int Id, string Title, string Description, str
     string Remediation, string Condition, CheckStatus Status, string Reason, IReadOnlyList<RuleEvidence> Rules)
 {
     public static CheckEvidence From(Check check, CheckResult result) =>
-        new(check.Id, check.Name, check.Description, check.Rationale, check.Remediation,
+        new(check.Id, check.DisplayTitle, check.Description, check.Rationale, check.Remediation,
             check.Condition, result.Status, result.Reason,
             result.RuleResults.Select((rule, index) =>
                 new RuleEvidence(check.Rules[index], rule.Passed, rule.Invalid, rule.Detail)).ToArray());

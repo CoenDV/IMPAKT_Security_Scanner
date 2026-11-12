@@ -16,7 +16,7 @@ Het JSON-document bevat `schemaVersion`, scanner, host, besturingssysteem, doelp
 
 ## Policies
 
-Policies volgen het Wazuh SCA-formaat. Checks en `requirements` hebben een `name:` (niet `title:`; een check zonder `name:` geeft een waarschuwing). Een `c:`-regel draait op Windows al in PowerShell: schrijf direct PowerShell en geen geneste `powershell ...`- of `cmd /c powershell ...`-aanroep, want die wordt niet goed uitgevoerd.
+Policies volgen het Wazuh SCA-formaat. Checks en `requirements` ondersteunen zowel `title:` als `name:`. Als beide zijn ingevuld, toont het rapport `title:`. Een check zonder titel of naam geeft een waarschuwing.
 
 Status `invalid` betekent dat een regel niet uitgevoerd kon worden (timeout, geen toegang, kapotte regel, niet-ondersteund platform). Een ontbrekend bestand, map of registerwaarde is gewoon `failed` (met `not` juist `passed`).
 
@@ -26,4 +26,4 @@ Rapportverzending gaat via de aparte `Sftp_Uploader`. CIS-benchmarks zijn eigend
 
 Exitcodes: `0` bij een scan zonder gefaalde checks; `1` bij gefaalde checks, niet-gehaalde requirements of fouten, inclusief YAML-parsefouten tijdens policyselectie. Controleer policies vóór gebruik: commandoregels worden op het doelsysteem uitgevoerd met de rechten van de gebruiker.
 
-Op Windows voert de scanner elke `c:`-regel uit als PowerShell-script. Veelgebruikte Wazuh-vormen worden daarbij automatisch omgezet: `powershell -NoProfile -Command "…"`, `powershell.exe …` (ook met volledig pad en `%VARIABELE%`), `cmd /c …` en `-EncodedCommand`. Gepubliceerde CIS-policies kun je daardoor ongewijzigd gebruiken; `--display-details` toont per regel welke uitvoer is verkregen.
+Op Windows voert de scanner `c:`-regels uit als PowerShell-script. De scanner ondersteunt directe PowerShell en zet veelgebruikte Wazuh-vormen automatisch om, waaronder `powershell -NoProfile -Command "…"`, `powershell.exe …` met volledig pad of `%VARIABELE%`, `cmd /c powershell …` en `-EncodedCommand`. Met `--display-details` zie je de uitvoer per regel.

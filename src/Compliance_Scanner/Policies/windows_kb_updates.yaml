@@ -11,7 +11,7 @@ requirements:
   description: "This policy applies only to Windows systems"
   condition: all
   rules:
-    - 'c:cmd /c ver -> r:Windows'
+    - 'r:HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion'
 
 checks:
   - id: 99998

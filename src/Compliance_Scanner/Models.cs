@@ -99,9 +99,9 @@ public sealed class SCAPolicy
 
     public List<Check>    Checks   { get; set; } = [];
 
-    /// <summary>IDs of checks without a name, e.g. a policy still using the old `title:` key (unknown keys are ignored).</summary>
-    public List<int> CheckIdsWithoutName() =>
-        Checks.Where(check => string.IsNullOrWhiteSpace(check.Name)).Select(check => check.Id).ToList();
+    /// <summary>IDs of checks without a title or name.</summary>
+    public List<int> CheckIdsWithoutDisplayTitle() =>
+        Checks.Where(check => string.IsNullOrWhiteSpace(check.DisplayTitle)).Select(check => check.Id).ToList();
 }
 
 // ---------------------------------------------------------------------------
@@ -121,6 +121,7 @@ public sealed class PolicyMetadata
 // ---------------------------------------------------------------------------
 public sealed class Requirements
 {
+    public string       Title       { get; set; } = string.Empty;
     public string       Name        { get; set; } = string.Empty;
     public string       Description { get; set; } = string.Empty;
     /// <summary>YAML value: all | any | none</summary>
@@ -146,7 +147,18 @@ public sealed class Requirements
 public sealed class Check
 {
     public int          Id          { get; set; }
+
+    /// <summary>Check title as used by Wazuh 4.x policies (<c>title:</c>).</summary>
+    public string       Title       { get; set; } = string.Empty;
+
+    /// <summary>Check name as used by Wazuh 5.x policies (<c>name:</c>).</summary>
+    [YamlMember(Alias = "name")]
     public string       Name        { get; set; } = string.Empty;
+
+    /// <summary>Title used in reports: <see cref="Title"/> when set, otherwise <see cref="Name"/>.</summary>
+    [YamlIgnore]
+    public string       DisplayTitle => !string.IsNullOrWhiteSpace(Title) ? Title : Name;
+
     public string       Description { get; set; } = string.Empty;
     public string       Rationale   { get; set; } = string.Empty;
     public string       Remediation { get; set; } = string.Empty;

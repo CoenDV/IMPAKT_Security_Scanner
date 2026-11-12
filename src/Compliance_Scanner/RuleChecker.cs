@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Globalization;
 using System.Text;
 using System.Text.RegularExpressions;
+using System.Xml.Linq;
 
 namespace Compliance_Scanner;
 
@@ -368,17 +369,10 @@ public static class RuleChecker
             ProcessStartInfo psi;
             if (OperatingSystem.IsWindows())
             {
-                // Always use PowerShell on Windows for consistency and to support full paths
-                // like "%WINDIR%\SysNative\WindowsPowerShell\v1.0\powershell <args>"
-                // Expand Windows-style %VAR% environment variables (cmd.exe syntax)
-                // so they work in PowerShell
-                string expandedTarget = Environment.ExpandEnvironmentVariables(rule.Target);
-
-                // If the command itself is a path to powershell.exe, extract just the arguments
-                // (e.g., "C:\Windows\...\powershell.exe secedit /export ..." -> "secedit /export ...")
+                // Translate Wazuh command rules before passing the script to PowerShell.
                 // Progress output would otherwise end up on stderr as CLIXML.
-                string commandToRun = "$ProgressPreference = 'SilentlyContinue'; "
-                    + (ExtractPowerShellArguments(expandedTarget) ?? expandedTarget);
+                string commandToRun = "$ProgressPreference = 'SilentlyContinue';" + Environment.NewLine
+                    + WindowsCommand.ToPowerShellScript(rule.Target);
                 string encodedCommand = Convert.ToBase64String(Encoding.Unicode.GetBytes(commandToRun));
 
                 psi = new ProcessStartInfo("powershell.exe")
@@ -514,6 +508,7 @@ public static class RuleChecker
                 {
                     // A missing value is a normal "condition not met" (Failed), not an error (Invalid)
                     return new RuleCheckResult { Status = CheckStatus.Failed, Detail = $"Registry value '{rule.RegistryValueName}' not found in '{keyPath}'" };
+                }
 
                 string valueStr = FormatRegistryValue(value);
 
@@ -696,50 +691,49 @@ public static class RuleChecker
     /// With -EncodedCommand, PowerShell writes errors and progress to stderr as CLIXML ("#&lt; CLIXML ...").
     /// Returns the error/warning text from it, or "" when it only held progress. Other text is returned as is.
     /// </summary>
-    public static string PowerShellStderrToText(string stderr)
+    internal static string PowerShellStderrToText(string stderr)
     {
         const string header = "#< CLIXML";
-        if (!stderr.StartsWith(header, StringComparison.Ordinal)) return stderr;
+        if (!stderr.Contains(header, StringComparison.Ordinal)) return stderr;
 
         try
         {
-            var root = System.Xml.Linq.XElement.Parse("<root>" + stderr.Replace(header, "") + "</root>");
-            IEnumerable<string> messages = root.Descendants()
-                .Where(e => e.Name.LocalName == "S" && (string?)e.Attribute("S") is "Error" or "warning")
-                .Select(e => Regex.Replace(e.Value, "_x([0-9A-Fa-f]{4})_", m => ((char)Convert.ToInt32(m.Groups[1].Value, 16)).ToString()));
-            return string.Concat(messages).Trim();
+            string payload = Regex.Replace(stderr, "(?m)^#< CLIXML\r?\n", string.Empty);
+            if (payload == stderr) return stderr;
+
+            var root = XElement.Parse($"<root>{payload}</root>");
+            if (!root.Elements().Any() || root.Elements().Any(element => element.Name.LocalName != "Objs"))
+                return stderr;
+
+            StringBuilder text = new();
+            foreach (XNode node in root.Nodes())
+            {
+                if (node is XText plainText)
+                {
+                    text.Append(plainText.Value);
+                    continue;
+                }
+
+                if (node is not XElement records) continue;
+                foreach (XElement record in records.Elements())
+                {
+                    if (record.Name.LocalName != "S") continue;
+                    string? stream = (string?)record.Attribute("S");
+                    if (string.Equals(stream, "Error", StringComparison.OrdinalIgnoreCase)
+                        || string.Equals(stream, "Warning", StringComparison.OrdinalIgnoreCase))
+                    {
+                        string message = Regex.Replace(record.Value, "_x([0-9A-Fa-f]{4})_",
+                            match => ((char)Convert.ToInt32(match.Groups[1].Value, 16)).ToString());
+                        text.AppendLine(message.TrimEnd('\r', '\n'));
+                    }
+                }
+            }
+
+            return text.ToString().Trim();
         }
         catch (System.Xml.XmlException)
         {
             return stderr;
         }
-    }
-
-    /// <summary>
-    /// If the command is a full path to powershell.exe, extract just the arguments.
-    /// For example: "C:\Windows\...\powershell.exe secedit /export ..." returns "secedit /export ..."
-    /// Returns null if the command is not a PowerShell path (should use original command).
-    /// </summary>
-    private static string? ExtractPowerShellArguments(string command)
-    {
-        // Match paths ending with "powershell" or "powershell.exe" (case-insensitive)
-        // Look for the last occurrence to handle paths with spaces
-        int psIndex = command.LastIndexOf("powershell", StringComparison.OrdinalIgnoreCase);
-        if (psIndex < 0) return null;
-
-        // Check if it's "powershell.exe" or just "powershell"
-        int endIndex = psIndex + "powershell".Length;
-        if (endIndex < command.Length && command[endIndex..].StartsWith(".exe", StringComparison.OrdinalIgnoreCase))
-            endIndex += 4;
-
-        // Extract everything after "powershell" or "powershell.exe"
-        if (endIndex < command.Length)
-        {
-            string remainder = command[endIndex..].TrimStart();
-            if (!string.IsNullOrEmpty(remainder))
-                return remainder;
-        }
-
-        return null;
     }
 }

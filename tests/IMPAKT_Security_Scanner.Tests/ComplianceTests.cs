@@ -39,15 +39,17 @@ public class ComplianceTests
     public void MissingRegistryValueFailsInsteadOfBeingInvalid()
     {
         if (!OperatingSystem.IsWindows()) return;
-        const string key = @"HKEY_LOCAL_MACHINE\SOFTWARE\ImpaktNoSuchKey";
+        const string key = @"HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows NT\CurrentVersion";
+        string value = "impakt-missing-" + Guid.NewGuid().ToString("N");
+        string rule = $"r:{key} -> {value} -> 1";
 
         var positive = RuleChecker.EvaluateCheck(
-            new Check { Id = 1, Condition = "all", Rules = [$"r:{key} -> Value -> 1"] }, null);
+            new Check { Id = 1, Condition = "all", Rules = [rule] }, null);
         Assert.Equal(CheckStatus.Failed, positive.Status);
         Assert.False(positive.RuleResults[0].Invalid);
 
         var negated = RuleChecker.EvaluateCheck(
-            new Check { Id = 2, Condition = "all", Rules = [$"not r:{key} -> Value -> 1"] }, null);
+            new Check { Id = 2, Condition = "all", Rules = [$"not {rule}"] }, null);
         Assert.Equal(CheckStatus.Passed, negated.Status);
     }
 
@@ -63,13 +65,15 @@ public class ComplianceTests
     [Fact]
     public void PowerShellErrorClixmlBecomesReadableText()
     {
-        const string error = "#< CLIXML\r\n<Objs Version=\"1.1.0.1\" xmlns=\"http://schemas.microsoft.com/powershell/2004/04\">" +
+        const string error = "native stderr\r\n#< CLIXML\r\n<Objs Version=\"1.1.0.1\" xmlns=\"http://schemas.microsoft.com/powershell/2004/04\">" +
             "<S S=\"Error\">Get-Item : Cannot find path 'C:\\x' because it does not exist._x000D__x000A_</S>" +
-            "<S S=\"Error\">At line:1 char:1_x000D__x000A_</S></Objs>";
+            "<S S=\"Warning\">Example warning</S><S S=\"error\">At line:1 char:1_x000D__x000A_</S></Objs>";
 
         string text = RuleChecker.PowerShellStderrToText(error);
 
         Assert.Contains("Cannot find path 'C:\\x' because it does not exist.", text);
+        Assert.StartsWith("native stderr", text);
+        Assert.Contains($"Example warning{Environment.NewLine}At line:1 char:1", text);
         Assert.DoesNotContain("CLIXML", text);
         Assert.Equal("plain stderr", RuleChecker.PowerShellStderrToText("plain stderr"));
     }
@@ -79,7 +83,7 @@ public class ComplianceTests
     {
         if (!OperatingSystem.IsWindows()) return;
 
-        var check = new Check { Id = 1, Condition = "all", Rules = [@"c:Get-Item C:\impakt-no-such-path -> r:Cannot find path"] };
+        var check = new Check { Id = 1, Condition = "all", Rules = ["c:Write-Error 'impakt-clixml-probe' -> r:impakt-clixml-probe$"] };
 
         Assert.Equal(CheckStatus.Passed, RuleChecker.EvaluateCheck(check, null).Status);
     }
@@ -111,7 +115,7 @@ public class ComplianceTests
     }
 
     [Fact]
-    public void ChecksWithoutNameAreReportedSoAnOldTitleKeyDoesNotFailSilently()
+    public void OnlyChecksWithoutTitleOrNameAreReported()
     {
         const string yaml = """
             policy: { id: "p", file: "p.yml", name: "P", description: "d" }
@@ -120,7 +124,9 @@ public class ComplianceTests
                 name: "Has a name"
                 rules: ["f:/etc/hosts"]
               - id: 2
-                title: "Old style key, silently ignored"
+                title: "Has a title"
+                rules: ["f:/etc/hosts"]
+              - id: 3
                 rules: ["f:/etc/hosts"]
             """;
         var deserializer = new YamlDotNet.Serialization.DeserializerBuilder()
@@ -130,7 +136,7 @@ public class ComplianceTests
 
         SCAPolicy policy = deserializer.Deserialize<SCAPolicy>(yaml);
 
-        Assert.Equal([2], policy.CheckIdsWithoutName());
+        Assert.Equal([3], policy.CheckIdsWithoutDisplayTitle());
     }
 
     [Fact]
